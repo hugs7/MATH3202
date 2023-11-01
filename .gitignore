@@ -1,6 +1,6 @@
 # Exclude .mkv and .mk4 files
 *.mkv
-*.mk4
+*.mp4
 
 # Exclude Microsoft Documents files
 *.docx
