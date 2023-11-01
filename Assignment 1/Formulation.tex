@@ -1,0 +1,47 @@
+\documentclass{article}
+
+\usepackage{amsmath,amssymb,fullpage}
+\setlength\parindent{0pt}
+\begin{document}
+	\section*{Mine Planning}
+	\subsection*{Sets}
+	
+	\begin{tabular}{rl}
+		$I$ & Set of customers\\
+		$J$ & Set of deposits
+	\end{tabular}
+
+	\subsection*{Data}
+	
+	\begin{tabular}{rl}
+		$c_j$ & Cost per tonne of mining from deposit $j\in DJ$\\
+		$u_j$ & Mining capacity of deposit $j\in J$\\
+		$r_i$ & Required tonnes of customer $i\in I$\\
+		$Al_j$ & Aluminium content of deposit $j\in J$\\
+		$Si_j$ & Silicon content of deposit $j\in J$\\
+		$MinAl_i$ & Minimum aluminium requirement of customer $i\in I$\\
+		$MinSi_i$ & Minimum silicon requirement of customer $i\in I$		
+	\end{tabular}
+
+	\subsection*{Variables}
+	
+	\begin{tabular}{rl}
+		$x_{ij}$ & How many tonnes to mine from deposit $j\in J$ and deliver to customer $i\in I$
+	\end{tabular}
+
+	\subsection*{Objective}
+	\begin{equation*}
+	\min \sum_{i\in I}\sum_{j\in J}c_j x_{ij} 
+	\end{equation*}
+	
+	\subsection*{Constraints}
+	\begin{align}
+		\sum_{i\in I} x_{ij} \leq u_j && \forall j\in J\label{C1}\\
+		\sum_{j\in J} x_{ij} \geq r_i && \forall i\in I\label{C2}\\
+		\sum_{j\in J}\left(MinAl[i]-Al[j]\right)x_{ij} \leq 0 && \forall i\in I\label{C3}\\
+		\sum_{j\in J}\left(MinSi[i]-Si[j]\right)x_{ij} \leq 0 && \forall i\in I\label{C4}\\
+		x_{ij}\geq 0 && \forall i\in I, \forall j\in J\label{C5}
+	\end{align}
+	
+	Constraints (\ref{C1}) say that the amount mined from a deposit must not exceed its capacity, and constraints (\ref{C2}) ensure that each customer receives the tonnage they have requested. Constraints (\ref{C3}-\ref{C4}) enforce the minimum aluminium and silicon requirements respectively.
+\end{document}

@@ -1,0 +1,103 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Jun 11 10:20:26 2023
+
+@author: Hugo Burton
+"""
+
+# 2022 Q1 c
+
+from gurobipy import *
+	
+Factories = ["A","B","C"]
+Months = ["Jul","Aug","Sep","Oct","Nov","Dec"]
+Grains = ["Wheat","Corn"]
+
+F = range(len(Factories))
+T = range(len(Months))
+G = range(len(Grains))
+H = range(5)
+
+Capacity = 4000
+StoreCost = 1.5
+Starting = [600,300]
+ShipCost = 12000
+VisitCost = 5000
+HoldCap = 800
+
+# Demand[f][t][g]
+Demand = [[[565, 290], [695, 285], [385, 315], [500, 245], [785, 270], [540, 275]], [[1050, 300], [585, 325], [510, 205], [1050, 270], [810, 210], [545, 285]], [[720, 315], [545, 465], [520, 315], [475, 465], [415, 480], [985, 525]]]
+
+# Cost[t][g]
+Cost = [[95, 43], [97, 50], [89, 76], [65, 70], [82, 49], [79, 48]]
+
+m = Model("Factories Q1")
+
+# Purchase
+X = { (f,t,g): m.addVar(vtype=GRB.CONTINUOUS) for f in F for t in T for g in G }
+
+# Inventory
+Y = { (f,t,g): m.addVar(vtype=GRB.CONTINUOUS) for f in F for t in T for g in G }
+
+Z = { (f,t): m.addVar(vtype=GRB.BINARY) for f in F for t in T }
+
+W = { t: m.addVar(vtype=GRB.BINARY) for t in T }
+
+V = { (g,h,t): m.addVar(vtype=GRB.BINARY) for g in G for h in H for t in T } # Holds
+
+m.setObjective(quicksum(quicksum(StoreCost * Y[f,t,g] + Cost[t][g] * X[f,t,g] 
+                                  for f in F for g in G) + VisitCost * quicksum(Z[f,t] for f in F) + ShipCost * W[t] for t in T), GRB.MINIMIZE)
+
+# Constraints
+
+for f in F:
+    for g in G:
+        m.addConstr(Y[f,0,g] == Starting[g])
+        m.addConstr(Y[f,5,g] == Starting[g])
+
+for t in T:
+    m.addConstr(quicksum(X[f,t,g] for f in F for g in G) <= W[t] * Capacity)
+    
+    for f in F:
+        m.addConstr(quicksum(X[f,t,g] for g in G) <= Capacity * Z[f,t])
+        m.addConstr(Z[f,t] <= W[t])
+        
+        for g in G:
+            if t > 0:
+                # m.addConstr(Y[f,t,g] + X[f,t,g] >= Demand[f][t][g])
+            
+                m.addConstr(Y[f,t,g] == Y[f,t-1,g] + X[f,t,g] - Demand[f][t][g])
+                m.addConstr(Y[f,t,g] >= 0)
+                
+            else:
+                # t == 0. First month
+                m.addConstr(Y[f,t,g] + X[f,t,g] >= Demand[f][t][g])
+    
+    for h in H:
+        m.addConstr(quicksum(V[g,h,t] for g in G) <= 1) # At most one grain in each hold
+        for g in G:
+            m.addConstr(V[g,h,t] <= W[t])
+    
+    for g in G:
+        m.addConstr(X[f,t,g] <= HoldCap * quicksum(V[g,h,t] for h in H))    # Can't purchase more than can hold
+        
+    
+    
+
+m.optimize()
+
+print("Objective value", m.objVal)
+
+for t in T:
+    print("\n--\nMonth", t)
+    for f in F:
+        print("factory", f)
+        for g in G:
+            print(f"| {round(X[f,t,g].x,2):<10} | {round(Y[f,t,g].x,2):<10} | {Demand[f][t][g]:<5} | {Z[f,t].x:<5} |")
+    
+    print("\nShip")
+    for h in H:
+        print("Hold", h)
+        for g in G:
+            print(f"| {V[g,h,t].x:<5} |")
+            
