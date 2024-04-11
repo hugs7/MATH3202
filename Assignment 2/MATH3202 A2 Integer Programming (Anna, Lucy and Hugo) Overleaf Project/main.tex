@@ -1,0 +1,689 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\graphicspath{ {./images/} }
+\usepackage{enumitem}
+\usepackage[utf8]{inputenc}
+\usepackage{bm}
+\usepackage{amsmath}
+\usepackage{mathtools}% Loads amsmath
+\usepackage{amssymb}
+\usepackage{multicol}
+\usepackage{xcolor}
+\usepackage{multirow}
+\usepackage{arydshln}
+
+\setlength{\dashlinedash}{4pt}
+\setlength{\dashlinegap}{4pt}
+\newcommand{\scriptP}{\mathcal{P}}
+\allowdisplaybreaks
+\usepackage{geometry}
+ \geometry{
+ a4paper,
+ total={170mm,257mm},
+ left=17mm,
+ top=20mm,
+ }
+% Footer
+\usepackage{fancyhdr}
+\newcommand{\E}{\ensuremath{\mathbb{E}}}
+\pagestyle{fancy}
+\fancyhf{} 
+\fancyfoot[L]{MATH3202 A2}
+\fancyfoot[C]{Hugo Burton, Lucy Ochre, and Anna Henderson}
+\fancyfoot[R]{\thepage}
+\renewcommand{\headrulewidth}{0pt} % Remove the line at the top of the page
+\renewcommand{\footrulewidth}{0.4pt} % Add a line just above the footer
+
+% cmds
+\renewcommand*{\thesection}{\Alph{section}}
+
+\begin{document}
+\color{black}
+\begin{titlepage}
+    \begin{center}
+        \vspace*{1cm}
+            
+        \Huge
+        \textbf{MATH3202 Integer Programming}
+            
+        \vspace{0.5cm}
+        \Large
+        Assignment 2
+            
+        \vspace{1.5cm}
+            
+        \textbf{Hugo Burton} (s4698512);\\ \textbf{Lucy Ochre} (s4699043); \&\\ \textbf{Anna Henderson} (s4641893)\\
+        \bigskip
+        \text{April 2023}
+        \vfill
+        \text{(Using Hugo's Data)}
+        \vfill
+        
+        %\includegraphics[width=0.4\textwidth]
+        \centering{
+            \includegraphics[width=0.25\textwidth]{MSS-logo2}\\
+        }
+        \vspace{2cm}
+        \Large
+        UQ Mathematics\\
+        The University of Queensland\\
+        Australia\\
+        Course code: MATH3202
+    \end{center}
+\end{titlepage}
+
+\section{Report to Boss}
+%A general mathematical formulation of the problem, including definitions of sets, data, variables, objective function and constraints. 7 marks • A Python file with the problem modelled for Gurobi. This should be easy to relate back to the formulation. Your boss will attempt to execute this model. 5 marks
+\color{black}
+\bigskip
+
+\subsection{Sets}
+\bigskip
+In a integer programming problem, sets are a collection of defined objects required to model the problem. They have been described in the following table:\\
+\bigskip
+\renewcommand\baselinestretch{1.5}
+\begin{table}[htb]
+    \centering
+    \color{black}
+    \begin{tabular}{|c:l|}
+        \hline
+        \textbf{Set} & \textbf{Description} \\
+        \hline
+        \(N\) & Nodes \\ \hdashline
+        \(S\) & Suppliers - a subset of Nodes \((S\subset N)\)\\ \hdashline
+        \(P\) & Pipelines\\ \hdashline
+        \(T\) & Years\\ \hdashline
+        \(U\) & Supplier Capacity Upgrades \\ \hdashline
+        \(\Omega\) & Scenarios of demand in 10 years time \\
+        \hline
+    \end{tabular}
+    \caption{Table of sets within the model}
+    \label{tab:sets}
+\end{table}
+\renewcommand\baselinestretch{1}\\
+
+\noindent
+A few notes about the sets defined in this problem:\\
+\\
+The set \(T\) of years contains only \(\{0,1\}\) which map to \(5\) and \(10\) years respectively. Defining the set this way simplifies the logic when it comes to program in Python/Gurobi. \\
+\\
+The set \(U\) of supplier capacity upgrades has the values \(\{0,1,2,3\}\) which represent no upgrade (0), and the upgrade options 1, 2, and 3. \\
+\\
+The set \(\Omega\) defines the different scenarios that can take place over the 5-10 year period from now. The possible scenarios are demand is down by (-20\%), as forecasted (0\%), or up by (+20\%)
+
+\bigskip
+\subsection{Data}
+\bigskip
+\renewcommand\baselinestretch{1.5}
+\begin{table}[htb]
+    \centering
+    \color{black}
+        \begin{tabular}{|c:l:c|}
+        %\begin{tabular*}{375pt}{@{\extracolsep{\fill}}|c l c|}
+        \hline
+        \textbf{Variable} & \textbf{Description} & \textbf{Units} \\
+        \hline
+        \(d_{n,t}\) & Demand of gas at node \(n\in N\) in \(t \in T\) years time & MJ \\ \hdashline
+        \(a_{n,u}\) & Capacity at node \(n \in N\) with upgrade \(u \in U\) (normal nodes have 0 cap) & MJ \\ \hdashline
+        \(c_{n,u}\) & Cost of capacity upgrade \(u \in U\) at node \(n \in N\)  & \$ \\ \hdashline
+        % \(c_n\) & Cost of gas at node n & \(\$\) \\ \hdashline
+        % \(l_p\) & Length of pipeline \(p\in P\) & km \\ \hdashline
+        \((f_p, \tau_p)\) & (Node \(n\in N\) pipe \(p \in P\) is from, Node \(n \in N\) pipe \(p \in P\) goes to) & \(\cdot\) \\ \hdashline
+        % \(M\) & Maximum flow of gas through any pipe per day & \(\frac{MJ}{\text{day}}\) \\ \hdashline
+        % \(G\) & Maximum gas per supplier over 2 weeks & MJ \\ \hdashline
+        \(l_p\) & Length of pipe \(p \in P\) & km \\ \hdashline
+        \(k\) & Cost of upgrading (doubling) pipeline to double capacity & \(\frac{\$}{\text{km}}\) \\ \hdashline
+        \(b\) & Pipeline capacity (fixed for all pipelines) & MJ \\ \hdashline
+        \(\delta_t\) & Discount factor for year \(t \in T\) & \(\%\) \\ \hdashline
+        \(\theta_\omega\) & Probability of experiencing scenario \(\omega \in \Omega\) & \(\cdot\) \\ \hdashline
+        \(\lambda_{t,\omega}\) & Effect on demand (as a percentage change) at time \(t \in T\) in scenario \(\omega \in \Omega\) & \(\%\) \\
+        \hline
+    \end{tabular}
+    \caption{Table outlining the data present within the model}
+    \label{tab:data}
+\end{table}
+Where normal nodes refer to non-supplier nodes.
+\renewcommand\baselinestretch{1}
+\bigskip
+\newpage
+\subsection{Variables}
+\bigskip
+The variables in the model are defined in the following table.
+
+\renewcommand\baselinestretch{1.5}
+\begin{table}[htb]
+    \centering
+    \color{black}
+    \begin{tabular}{|c:l:c|}
+        \hline
+        \textbf{Variable} & \textbf{Description} & \textbf{Possible values} \\
+        \hline
+        \(x_{n,t,\omega}\) & Gas produced at node \(n \in N\) at time \(t \in T\) in scenario \(\omega \in \Omega\) & \(\mathbb{R}^{\geq 0}\) \\ \hdashline
+        \(y_{p,t,\omega}\) & Gas that has flowed through pipe \(p\in P\) on day \(t \in T\) in scenario \(\omega \in \Omega\) & \(\mathbb{R}^{\geq 0}\) \\ \hdashline
+        \(z_{n,t,u,\omega}\) & Upgrade \(u \in U\) at year \(t \in T\) chosen for node \(n \in N\) in scenario \(\omega \in \Omega\) & \(\left\{0, 1\right\}\) \\ \hdashline
+        \(\psi_{p,t,\omega}\) & Pipeline upgrade \(p \in P\) for \(t\in T\) in scenario \(\omega \in \Omega\) & \(\left\{0, 1\right\}\) \\
+        \hline
+    \end{tabular}
+    \caption{Table of decision variables}
+    \label{tab:vars}
+\end{table}
+\renewcommand\baselinestretch{1}
+\bigskip
+\subsection{Objective}
+\bigskip
+The objective should be to minimise the upgrade cost (but of course, we still need to meet the demand constraints with growing demand).\\
+\\
+Communication 6
+\[\min{\left\{\sum_{n\in N}\left[\sum_{u \in U}c_{n,u} z_{n,u}\right]\right\}}\]
+\smallskip\noindent
+Communication 7
+\[\min{\left\{\sum_{n\in N}\sum_{u \in U}c_{n,u} z_{n,u} + k \sum_{p \in P}\psi_p l_p\right\}}\]
+\smallskip\noindent
+Communication 8
+\smallskip\noindent
+\[\min{\left\{\sum_{t\in T}\left[\sum_{n\in S}\sum_{u \in U}c_{n,u}  (1 - \delta_{t}) z_{n,t,u} + k \sum_{p \in P}(1 - \delta_{t})\psi_{p,t} l_p\right]\right\}}\]
+\smallskip\noindent
+Communications 9 and 10
+
+\begin{align}
+    &\min{\left\{\E_{\omega\in \Omega}\left[\sum_{t\in T}\left[\sum_{n\in S}\sum_{u \in U}c_{n,u}  (1 - \delta_{t}) z_{n,t,u,\omega} + k \sum_{p \in P}(1 - \delta_{t})\psi_{p,t,\omega} l_p\right]\right]\right\}} \\
+    =& \min{\left\{\sum_{\omega \in \Omega} \theta_\omega \cdot\left[\sum_{t\in T}\left[\sum_{n\in S}\sum_{u \in U}c_{n,u}  (1 - \delta_{t}) z_{n,t,u,\omega} + k \sum_{p \in P}(1 - \delta_{t})\psi_{p,t,\omega} l_p\right]\right] \right\}} 
+\end{align}
+
+\bigskip
+Where:
+\begin{enumerate}
+    \item \(\theta_\omega = \frac{1}{3}, \hspace{1cm} \forall \omega \in \Omega\)
+    \item \(k = \$ 200,000\)
+    \item \(\delta_t = \begin{cases}
+    0.0, & \text{if } t = 0 \\
+    0.3, & \text{if } t = 1
+    \end{cases}\)
+\end{enumerate}
+\newpage
+\subsection{Constraints}
+
+\noindent
+\subsubsection{Supplier Capacity}
+%\[x_{n,t}\leq a_{n,0} + \sum_{\substack{u \in U \\ u \neq 0}}\left\{a_{n,u}z_{n,u}\right\}, \hspace{1cm} \forall n\in N \hspace{0.5cm} \forall t \in T\]
+% ^^ for previous to comm 8 (not including)
+\[x_{n,t,\omega}\leq a_{n,0} + \sum_{\substack{u \in U \\ u \neq 0}}\left\{a_{n,u} \sum_{\substack{t^*\in T \\ t^* \leq t}}z_{n,t^*,u,\omega}\right\}, \hspace{1cm} \forall n\in N \hspace{0.5cm} \forall t \in T \hspace{0.5cm} \forall \omega \in \Omega\]
+\smallskip\noindent
+Where \(a_{n,0}\) denotes the base capacity (with no upgrades) for node \(n \in N\). Of course only \(a_{n,0} \geq 0\) for \(n \in S\).\\
+\\
+We also have
+
+\[x_{n,t,\omega} = 0, \hspace{1cm} \forall n\in N \setminus S \hspace{0.5cm} \forall t \in T \hspace{0.5cm} \forall \omega \in \Omega\]
+... as we cannot produce gas at a normal node.
+
+\bigskip
+\subsubsection{Supplier Upgrades}
+We are constrained to choosing either one of the upgrades per supplier node or no upgrade at all. Additionally, any given supplier node can have at most one upgrade over the 10 year period.
+\[\sum_{\substack{u\in U \\ u \neq 0}}\sum_{t\in T} z_{n,t,u,\omega} \leq 1, \hspace{0.5cm} \forall n \in S \hspace{0.5cm} \forall \omega \in \Omega\]
+\noindent
+For any given generator and for any given year, exactly 1 level must be chosen (including no upgrade)
+\[\sum_{u\in U} z_{n,t,u,\omega} = 1, \hspace{0.5cm} \forall n \in S \hspace{0.5cm} \forall t \in T \hspace{0.5cm} \forall \omega \in \Omega\]
+\noindent
+For any given node that is not a generator, no upgrades can be selected.
+\[\sum_{u\in U}\sum_{t\in T} z_{n,t,u,\omega} = 0, \hspace{0.5cm} \forall n \in N \setminus S \hspace{0.5cm} \forall \omega \in \Omega\]
+
+\bigskip
+\noindent
+\subsubsection{Pipeline Capacity}
+The pipelines have a fixed capacity, however, these can be upgraded to double their existing capacity at a cost. We have a binary variable to decide whether to upgrade the pipe at time \(t \in T\) which takes the values 0 or 1. Then the maximum flow of gas in the pipe is bounded by a function of the binary variable multiplied by the pipe's base capacity.
+
+\[Y_{p,t,\omega} \leq \left(1 + \sum_{\substack{t^*\in T \\ t^* \leq t}}\psi_{p,t^*,\omega}\right) b, \hspace{1cm} \forall p \in P \hspace{0.5cm} \forall t \in T \hspace{0.5cm} \forall \omega \in \Omega\]
+\\
+Where \(b = 281 \text{MJ}\).
+\smallskip
+\noindent 
+We also need to make the constraint that any given pipe \(p \in P\) can only be upgraded at most once.
+
+\[\sum_{t \in T} \psi_{p,t,\omega} \leq 1, \hspace{1cm} \forall p \in P \hspace{0.5cm} \forall \omega \in \Omega\]
+
+
+\newpage
+\noindent
+\subsubsection{Scenario Constraints}
+Given that the problem says we cannot know which scenario we will experience in time step 1, all the upgrades in time step 0 must be the same. We can do this by constraining the upgrade variables to be equal to each other.
+
+\begin{align}
+    z_{n,0,u,0} &= z_{n,0,u,1}, & \hspace{1cm} \forall n \in N \hspace{0.5cm} \forall u \in U \\
+    z_{n,0,u,1} &= z_{n,0,u,2}, & \hspace{1cm} \forall n \in N \hspace{0.5cm} \forall u \in U \\
+    \psi_{p,0,0} &= \psi_{p,0,1}, & \hspace{1cm} \forall p \in P \\
+    \psi_{p,0,1} &= \psi_{p,0,2}, & \hspace{1cm} \forall p \in P
+\end{align}
+
+\bigskip
+\noindent
+\subsubsection{Flow Balance Constraints}
+We must create a flow balance constraint to say that the gas produced plus the inflow of gas must equal the demand of gas plus the outflow of gas at each node on the grid. Mathematically, this is very similar to the first assignment and can be written as
+
+\[x_{n,t,\omega}+\sum_{\substack{p\in P \\ \tau_p = n}}y_{p,t,\omega} = d_{n,t} (1 + \lambda_{t,\omega}) + \sum_{\substack{p\in P \\ f_p = n}}y_{p,t,\omega}, \hspace{1cm} \forall n \in N \hspace{0.5cm} \forall t \in T \hspace{0.5cm} \forall \omega \in \Omega\]
+\smallskip\noindent
+Where
+\(\boldsymbol{\lambda} = 
+    \begin{bmatrix}
+    0.0 & 0.0 & 0.0 \\
+    -0.2 & 0.0 & 0.2
+    \end{bmatrix}\)
+
+\bigskip
+\subsubsection{Communication 10 Upgrade Constraint}
+Communication 10 states \textit{"the undiscounted upgrade costs in the second 5-year period should never be more than twice the upgrade costs in the first 5-year period."}\\
+\\
+We can very easily translate this into a mathematical constraint as follows
+
+\[{SU}_{1} + {PU}_{1} \leq 2 \left[{SU}_{0} + {PU}_{0}\right], \hspace{1cm} \forall \omega \in \Omega\]
+
+\noindent
+Where
+
+\begin{align}
+    {SU}_{t} &= \sum_{n \in S}\sum_{u \in U} c_{n,u} z_{n,t,u,\omega} \\
+    {PU}_{t} &= k \sum_{p \in P}  \psi_{p,t,\omega} l_{p}
+\end{align}
+
+\noindent
+for \(t \in T\). Again, where \(k = \$ 200,000\).
+
+\noindent
+
+\bigskip
+
+\subsubsection{Non-negativity}
+\bigskip
+Non-negativity constraints are (fortunately) given to us when using Gurobi, however, it is still important that they are defined in the mathematical model for understanding and completeness.\\
+\\
+We have
+
+\[x_{n,t,\omega} \geq 0, \hspace{1cm} \forall n \in N \hspace{0.5cm} \forall t \in T \hspace{0.5cm} \forall \omega \in \Omega\]
+... as gas-producing nodes (gas stations) produce a non-negative amount of gas.
+We also have
+
+\begin{align*}
+    y_{p,t,\omega} \geq 0,& \hspace{1cm} \forall p \in P \hspace{0.5cm} \forall t \in T \hspace{0.5cm} \forall \omega \in \Omega \\
+    z_{n,t,u,\omega} \in \{0,1\},& \hspace{1cm} \forall n \in N \hspace{0.5cm} \forall t \in T \hspace{0.5cm} \forall u \in U \hspace{0.5cm} \forall \omega \in \Omega \\
+    \psi_{p,t,\omega} \in \{0,1\},& \hspace{1cm} \forall p \in P \hspace{0.5cm} \forall t \in T \hspace{0.5cm} \forall \omega \in \Omega
+\end{align*}
+
+\bigskip
+
+
+\bigskip
+\subsection{Solution}
+\bigskip
+After running this problem through Gurobi, it was found that the optimal total cost (without any limit on imbalance) was \(\boldsymbol{\$118,626,670.89}\) to produce and distribute the gas throughout the network. The optimal strategy for planning the scheduled upgrades is as follows: 
+
+\renewcommand\baselinestretch{1.4}
+\begin{table}[htb]
+    \centering
+    \color{black}
+    \begin{tabular}{|c|c:c:c:c|c|}
+        \hline
+        \textbf{Scenario} & \textbf{Supplier Node} & \textbf{Upgrade Option} & \textbf{Period} & \textbf{Cost} & \textbf{Scenario Cost} \\
+        \hline
+        \multirow{4}{*}{\centering 1} & \textbf{15} & 0 & None & \$ 0 &  \multirow{4}{*}{\centering \$ 63,811,000} \\ \cdashline{2-5}
+                                      & \textbf{31} & 0 & None & \$ 0  &     \\ \cdashline{2-5}
+                                      & \textbf{35} & 0 & None &   \$ 0 &     \\ \cdashline{2-5}
+                                      & \textbf{43} & 3 & First & \$ 63,811,000 &        \\ \hline
+        \multirow{4}{*}{\centering 2} & \textbf{15} & 1 & Second  & \$ 6,010,900 &  \multirow{4}{*}{\centering \$ 101,931,600} \\ \cdashline{2-5}
+                                      & \textbf{31} & 0 & None & \$ 0 &     \\ \cdashline{2-5}
+                                      & \textbf{35} & 2 & Second & \$ 32,109,700 &   \\ \cdashline{2-5}
+                                      & \textbf{43} & 3 & First & \$ 63,811,000 &      \\ \hline
+        \multirow{4}{*}{\centering 3} & \textbf{15} & 3 & Second  & \$ 29,637,300 & \multirow{4}{*}{\centering \$ 155,506,800} \\ \cdashline{2-5}
+                                      & \textbf{31} & 0 & None & \$ 0 &           \\ \cdashline{2-5}
+                                      & \textbf{35} & 3 & Second & \$ 62,058,500 &     \\ \cdashline{2-5}
+                                      & \textbf{43} & 3 & First & \$ 63,811,000 &    \\ \hline
+    \end{tabular}
+    \caption{Supplier Upgrades in each scenario}
+    \label{tab:upgradesupoptscomm10parta}
+\end{table}
+\renewcommand\baselinestretch{1}
+\noindent
+\renewcommand\baselinestretch{1.4}
+\begin{table}[htb]
+    \centering
+    \color{black}
+    \begin{tabular}{|c|c:c:c|c|}
+        \hline
+        \textbf{Scenario} & \textbf{Upgraded Pipelines} & \textbf{Period} & \textbf{Cost} & \textbf{Scenario Cost}\\ \hline
+        \multirow{3}{*}{\centering 1} & \text{(43, 32)} & First  & \$ 2,200,000 & \multirow{3}{*}{\centering \$ 7,426,029.99} \\ \cdashline{2-4}
+                                      & \text{(43, 4)} & First & \$ 1,897,366 &                                   \\ \cdashline{2-4}
+                                      & \text{(4, 32)} & First & \$ 3,328,663 &                                   \\ \hline
+        \multirow{5}{*}{\centering 2} & \text{(43, 32)} & First  & \$ 2,200,000 & \multirow{5}{*}{\centering \$ 11,931,621.60}                                                   \\\cdashline{2-4}
+                                      & \text{(43, 4)} & First & \$ 1,897,366 &                                   \\ \cdashline{2-4}
+                                      & \text{(4, 32)} & First & \$ 3,328,663 &                                   \\\cdashline{2-4}
+                                      & \text{(35, 38)} & Second & \$ 1,691,626 &                                   \\ \cdashline{2-4}
+                                      & \text{(32, 12)} & Second & \$ 2,813,965 & \\ \hline
+        \multirow{7}{*}{\centering 3} & \text{(43, 32)} & First & \$ 2,200,000 & \multirow{7}{*}{\centering \$ 15,272,961.09}                                                   \\\cdashline{2-4}
+                                      & \text{(43, 4)} & First & \$ 1,897,366 &                                   \\ \cdashline{2-4}
+                                      & \text{(4, 32)} & First & \$ 3,328,663 &                                   \\\cdashline{2-4}
+                                      & \text{(35, 38)} & Second & \$ 1,691,626 &                                   \\ \cdashline{2-4}
+                                      & \text{(35, 10)} & Second & \$ 2,186,869 &                                   \\\cdashline{2-4}
+                                      & \text{(15, 25)} & Second & \$ 1,154,469 &                                   \\ \cdashline{2-4}
+                                      & \text{(32, 12)} & Second & \$ 2,813,965 & \\ \hline
+    \end{tabular}
+    \caption{Pipeline Upgrades in each scenario}
+    \label{tab:upgradepipeoptscomm10parta}
+\end{table}
+\renewcommand\baselinestretch{1}
+\bigskip
+\noindent
+
+%\color{black}
+\newpage
+\section{Client Report}
+\subsection{Communication 6}
+In communication 6, the pipeline network from the first assignment has remained the same, however, the problem that the Pacific Paradise Gas have asked us to solve has slightly changed. Specifically, we need to create a model that will solve for the minimal cost to upgrade the supplier nodes such that forecasted demand can be met in 10 years time. The upgrade options, stating the amount that capacity at each node will increase by, and the cost for that upgrades, are specified in the table below:
+
+%In communication 6, Pacific Paradise Gas requested that we produce an optimal total upgrade cost for their pipelines on a 5 and year basis. \\
+%We had previously been given their pipeline and network data as a part of the previous project conducted for Pacific Paradise Gas. However, to complete this new task task, we needed to obtain their new demand data at each node, which was given in a .csv file, and the upgrade options for each of the supplier nodes. A summary of the upgrade option data can be seen in the table below:
+\renewcommand\baselinestretch{1.5}
+\begin{table}[htb]
+    \centering
+    \color{black}
+    \begin{tabular}{|c|c:c|c:c|c:c|c:c|}
+        \hline
+        \multirow{2}{*}{\centering \textbf{Supplier Node}} & \multicolumn{2}{|c|}{\centering \textbf{Current}} & \multicolumn{2}{|c|}{\centering \textbf{Option 1}} & \multicolumn{2}{|c|}{\centering \textbf{Option 2}} & \multicolumn{2}{|c|}{\centering \textbf{Option 3}} \\
+        \cdashline{2-9}
+         & \underline{Capacity} & \underline{Cost} &\underline{Capacity} & \underline{Cost} &\underline{Capacity} & \underline{Cost} &\underline{Capacity} & \underline{Cost} \\ \hline
+        \textbf{15} & 434 MJ & \$0 & 82  MJ & \$ 8,587,000 & 220 MJ & \$20,837,000 & 427 MJ & \$42,339,000 \\ \hdashline
+        \textbf{31} & 928 MJ & \$0 & 188 MJ & \$18,346,000 & 462 MJ & \$44,625,000 & 919 MJ & \$85,722,000 \\ \hdashline
+        \textbf{35} & 961 MJ & \$0 & 190 MJ & \$19,243,000 & 486 MJ & \$45,871,000 & 967 MJ & \$88,655,000 \\ \hdashline
+        \textbf{43} & 680 MJ & \$0 & 129 MJ & \$13,418,000 & 339 MJ & \$32,794,000 & 680 MJ & \$63,811,000 \\ \hline
+    \end{tabular}
+    \caption{Supplier Upgrade Cost and Capacity}
+    \label{tab:supinfo}
+\end{table}
+\renewcommand\baselinestretch{1}
+\noindent
+\\
+The client informed us that only one upgrade option could be chosen for each supplier node, this includes the option to not upgrade the supplier node at all. We were asked to provide an optimal total upgrade cost to meet the forecasted demand in 10 years time, as given by the \underline{nodes3.csv} file provided by the clients. \\
+\\
+After applying an Integer Programming (IP) model, it was found that the optimal cost for meeting their demand needs in 10 years time is \$115,588,000. The following upgrades would need to occur in order for the demand to be met:\\
+\renewcommand\baselinestretch{1.5}
+\begin{table}[htb]
+    \centering
+    \color{black}
+    \begin{tabular}{|c:c:c|}
+        \hline
+        \textbf{Supplier Node} & \textbf{Upgrade Option} & \textbf{Cost} \\
+        \hline
+        \textbf{15} & 1 & \$  8,587,000 \\ \hdashline
+        \textbf{31} & 1 & \$ 18,346,000 \\ \hdashline
+        \textbf{35} & 3 & \$ 88,655,000 \\ \hdashline
+        \textbf{43} & 0 & \$ 0 \\ \hline
+    \end{tabular}
+    \caption{Supplier Upgrade Selected for Communication 6}
+    \label{tab:upgradeoptscomm6}
+\end{table}
+\renewcommand\baselinestretch{1}
+\noindent \\
+Where option 0 represents no upgrade to the supplier node. From this data, we can infer that both supplier nodes 15 and 31 will need the first upgrade option, supplier node 35 will need the third upgrade option and supplier node 43 will not need to be upgraded in order for the demand to be met with minimal total upgrade costs.
+\\
+\newpage
+\subsection{Communication 7}
+In communication 7, Pacific Paradise Gas informed us that there is now a maximum capacity of \textbf{281 MJ} in each of the existing pipelines. However, in 10 years time, this will result in the network having insufficient total pipeline capacity to deliver the gas from the upgraded suppliers to the normal nodes. As such, the clients informed us that they are able to duplicate any of their existing pipelines, effectively doubling their capacity at the cost of \$200,000 per kilometre.\\
+\\
+We have been asked to determine which supplier nodes and pipelines they should now upgrade in order to meet the forecasted demand in 10 years at a minimal cost.\\
+\\
+Upon adding this information to our Integer Programming model, it was determined that the new optimal cost in 10 years would be \$122,464,609. This is an increased cost of \$6,876,609 compared to our forecasted cost in Communication 6. \\
+\\
+It was determined that the following pipelines should be upgraded in order to meet the new demand and gas production:
+\bigskip
+\renewcommand\baselinestretch{1.5}
+\begin{table}[htb]
+    \centering
+    \color{black}
+    \begin{tabular}{|c:c|}
+        \hline
+        \textbf{Upgraded Pipeline} & \textbf{Cost} \\ \hline
+        (35, 38) & \$ 2,416,609 \\ \hdashline
+        (43, 32) & \$ 2,200,000 \\
+        \hline
+    \end{tabular}
+    \caption{Pipeline Upgrades Selected for Communication 7}
+    \label{tab:upgradepipeoptscomm7}
+\end{table}
+\renewcommand\baselinestretch{1}
+\bigskip
+\\
+\noindent
+The total pipeline upgrade cost was \(\$ 4,616,609.19\).\\
+\\
+The following supplier node upgrades should occur simultaneously with the pipeline upgrades in order to meet the forecasted demand in 10 years.
+\renewcommand\baselinestretch{1.5}
+\begin{table}[htb]
+    \centering
+    \color{black}
+    \begin{tabular}{|c:c:c|}
+        \hline
+        \textbf{Supplier Node} & \textbf{Upgrade Option} & \textbf{Cost} \\
+        \hline
+        \textbf{15} & 2 & \$ 20,837,000 \\ \hdashline
+        \textbf{31} & 1 & \$ 18,346,000 \\ \hdashline
+        \textbf{35} & 2 & \$ 45,871,000 \\ \hdashline
+        \textbf{43} & 2 & \$ 32,794,000 \\ \hline
+    \end{tabular}
+    \caption{Supplier Upgrade Selected for Communication 7}
+    \label{tab:upgradeoptscomm7}
+\end{table}
+\renewcommand\baselinestretch{1}
+\noindent \\
+From looking at this table, we can note that the supplier nodes that were upgraded changed from Communication 6, such that Supplier Nodes, 15, 35 and 43 now all get the second upgrade option, while Supplier Node 31 now gets the first upgrade option.
+\newpage
+\subsection{Communication 8}
+In communication 8, Pacific Paradise Gas informed us that by delaying their upgrades, they will be able to reduce costs associated with the production of the pipelines and supplier node upgrades. In order to do this they will divide their upgrades into a 5-year and 10-year period, at which the forecasted demand must be met by the upgrades in that time period. However, it is assumed that each pipeline and supplier node can only be upgraded once, although the upgrades made in the first time period will also have an effect in the second time period. \\
+\\
+We have been informed that the initial upgrades to pipelines and supplier nodes will have the same prices as mentioned in communications 6 and 7, however, upgrades done between years 5 and 10 will have a 30\% discount. \\
+\\
+After applying these new constraints to the problem, the supplier nodes and pipeline total upgrade costs was found to be \$89,746,196. This is a decrease of \$32,718,413, which is reasonable given the 30\% decrease in price for the majority of the upgrades. The new upgrade schedule can be seen in the tables below. where the first time period is between years 0 and 5, and the second time period is between year 5 and 10: \\
+\renewcommand\baselinestretch{1.5}
+\begin{table}[htb]
+    \centering
+    \color{black}
+    \begin{tabular}{|c:c:c|}
+        \hline
+        \textbf{Supplier Node} & \textbf{Upgrade Option} & \textbf{Period} \\
+        \hline
+        \textbf{15} & 1 & First \\ \hdashline
+        \textbf{31} & 1 & Second \\ \hdashline
+        \textbf{35} & 3 & Second \\ \hdashline
+        \textbf{43} & 0 & None \\ \hline
+    \end{tabular}
+    \caption{Supplier Upgrade Period for Communication 8}
+    \label{tab:upgradesupoptscomm8}
+\end{table}
+\renewcommand\baselinestretch{1}
+\noindent \\
+Note that Supplier Node 41 does not get upgraded in any of the time periods, and as such will have the same capacity as it did initially. It's interesting to note that the upgrades reverted back to those originally chosen in Communication 6, rather than the upgrades that were determined by the model in Communication 7.
+\renewcommand\baselinestretch{1.5}
+\begin{table}[htb]
+    \centering
+    \color{black}
+    \begin{tabular}{|c:c:c|}
+        \hline
+        \textbf{Upgraded Pipeline} & \textbf{Period} & \textbf{Cost} \\ \hline
+        \text{(30, 40)} & Second & \$ 2,380,000 \\ \hdashline
+        \text{(35, 38)} & Second & \$ 1,691,626 \\ \hdashline
+        \text{(35, 10)} & Second & \$ 2,186,869 \\
+        \hline 
+    \end{tabular}
+    \caption{Pipeline Upgrades Period for Communication 8}
+    \label{tab:upgradepipeoptscomm8}
+\end{table}
+\renewcommand\baselinestretch{1}
+\bigskip
+\\
+\noindent
+The total pipeline upgrade cost was \(\$ 6,258,496.35\).\\
+
+\noindent
+As we can see, the majority of the upgrades do occur in the second time period, between years 5 and 10, as this is the cheapest option for Pacific Paradise Gas due to the 30\% discount. \\
+
+\newpage
+\subsection{Communication 9}
+In communication 9, we have been informed that while the forecasts for the demand in 5 years time are certain, the same cannot be said about the demand in 10 years time. As a result, we have needed to plan around three scenarios outlined in the following table. We have also been advised to assume each scenario is equally likely.
+
+
+\renewcommand\baselinestretch{1.5}
+\begin{table}[htb]
+    \centering
+    \color{black}
+    \begin{tabular}{|c:c:c:c:c|}
+        \hline
+        \textbf{Scenario} & \textbf{Description} & \textbf{Probability} & \textbf{Demand at 5 years} & \textbf{Demand at 10 years} \\
+        \hline
+        1 & Downturn & \(\frac{1}{3}\) & \(d_{n,0}\) & \(d_{n,1} - 20\%\) \\ \hdashline
+        2 & As forecasted & \(\frac{1}{3}\) & \(d_{n,0}\) & \(d_{n,1}\) \\ \hdashline
+        3 & Upturn & \(\frac{1}{3}\) & \(d_{n,0}\) & \(d_{n,1} + 20\%\) \\ \hline
+    \end{tabular}
+    \caption{Feasible Demand Scenarios for Communication 9}
+    \label{tab:comm9forecasts}
+\end{table}
+\renewcommand\baselinestretch{1}
+\noindent
+Observe here how the demand at 5 years is certain, whereas the demand at 10 years isn't.\\
+\\
+Given these possible scenarios, we have been asked to calculate the optimal total \textbf{expected} upgrade cost. Notice that we need to condition over the cost, and not the demand. Upon taking the expectation in our integer programming problem, we arrive at a total expected upgrade cost of \$93,385,071.\\
+\\
+The expected cost is greater than the upgrade cost for communication 8, even though the probability of the demand is equal and centred around the forecasted demand. This is because in order to account for the greater demand, more upgrades need to be performed, and the upgrades are actually more than the grid needs. However, given there are finite upgrade options, these must be chosen for the scenario where demand is 20\% more than forecasted.\\
+\\
+For each scenario, the upgrade paths for both the suppliers and pipelines in the gas grid are summarised in the following two tables
+
+\renewcommand\baselinestretch{1.5}
+\begin{table}[htb]
+    \centering
+    \color{black}
+    \begin{tabular}{|c|c:c:c:c|c|}
+        \hline
+        \textbf{Scenario} & \textbf{Supplier Node} & \textbf{Upgrade Option} & \textbf{Period} & \textbf{Cost} & \textbf{Scenario Cost} \\
+        \hline
+        \multirow{4}{*}{\centering 1} & \textbf{15} & 1 & First & \$ 8,587,000 &   \multirow{4}{*}{\centering \$ 30,821,800} \\ \cdashline{2-5}
+                                      & \textbf{31} & 1 & Second & \$ 12,842,200  &                                  \\ \cdashline{2-5}
+                                      & \textbf{35} & 0 & None &   \$ 0 &                                   \\ \cdashline{2-5}
+                                      & \textbf{43} & 1 & Second & \$ 9,392,600 &                                   \\ \hline
+        \multirow{4}{*}{\centering 2} & \textbf{15} & 1 & First  & \$ 8,587,000 &  \multirow{4}{*}{\centering \$ 83,487,700} \\ \cdashline{2-5}
+                                      & \textbf{31} & 1 & Second & \$ 12,842,200 &                                   \\ \cdashline{2-5}
+                                      & \textbf{35} & 3 & Second & \$ 62,058,500 &                                   \\ \cdashline{2-5}
+                                      & \textbf{43} & 0 & None & \$ 0 &                                   \\ \hline
+        \multirow{4}{*}{\centering 3} & \textbf{15} & 1 & First  & \$ 8,587,000 & \multirow{4}{*}{\centering \$ 137,963,700} \\ \cdashline{2-5}
+                                      & \textbf{31} & 2 & Second & \$ 31,237,500 &                                   \\ \cdashline{2-5}
+                                      & \textbf{35} & 3 & Second & \$ 62,058,500 &                                   \\ \cdashline{2-5}
+                                      & \textbf{43} & 3 & Second & \$ 44,667,700 &                                   \\ \hline
+    \end{tabular}
+    \caption{Supplier Upgrades in each scenario for Communication 9}
+    \label{tab:upgradesupoptscomm9}
+\end{table}
+\renewcommand\baselinestretch{1}
+\noindent
+\newpage
+\renewcommand\baselinestretch{1.5}
+\begin{table}[htb]
+    \centering
+    \color{black}
+    \begin{tabular}{|c|c:c:c|c|}
+        \hline
+        \textbf{Scenario} & \textbf{Upgraded Pipelines} & \textbf{Period} & \textbf{Cost} & \textbf{Scenario Cost}\\ \hline
+        \multirow{1}{*}{\centering 1} & \text{None} & None & \$ 0 & \multirow{1}{*}{\centering \$ 0} \\ \hline
+        \multirow{3}{*}{\centering 2} & \text{(30, 40)} & Second  & \$ 238,000 & \multirow{3}{*}{\centering \$ 6,258,496.35} \\ \cdashline{2-4}
+                                      & \text{(35, 38)} & Second & \$ 1,691,626 &                                   \\ \cdashline{2-4}
+                                      & \text{(35, 10)} & Second & \$ 2,186,869 &                                   \\ \hline
+        \multirow{3}{*}{\centering 3} & \text{(31, 21)} & Second  & \$ 3,959,797 & \multirow{3}{*}{\centering \$ 13,036,515.31} \\ \cdashline{2-4}
+                                      & \text{(35, 38)} & Second & \$ 1,691,626 &                                   \\ \cdashline{2-4}
+                                      & \text{(35, 10)} & Second & \$ 2,186,869 &                                    \\ \hline
+    \end{tabular}
+    \caption{Pipeline Upgrades in each scenario for Communication 9}
+    \label{tab:upgradepipeoptscomm9}
+\end{table}
+\renewcommand\baselinestretch{1}
+\bigskip
+\noindent
+From here, we can add the costing for supplier upgrades and pipeline upgrades for each scenario before taking the expectation (with equal probabilities) to find the total expected upgrade cost as \$93,385,071.
+
+
+\newpage
+
+\subsection{Communication 10}
+In communication 10, Pacific Paradise has informed us they are concerned that too many of the upgrade projects have been scheduled for the second 5-year period. As a result, they would like us to ensure that the total undiscounted upgrade costs in the second 5-year period are never any more than twice the total upgrade costs within the first 5-year period.\\
+\\
+We have been informed that all the other conditions are the same as those in the previous communication 9. By taking this new constraint into consideration, we find that the optimal strategy for planning the scheduled upgrades is as follows: 
+
+\renewcommand\baselinestretch{1.2}
+\begin{table}[htb]
+    \centering
+    \color{black}
+    \begin{tabular}{|c|c:c:c:c|c|}
+        \hline
+        \textbf{Scenario} & \textbf{Supplier Node} & \textbf{Upgrade Option} & \textbf{Period} & \textbf{Cost} & \textbf{Scenario Cost} \\
+        \hline
+        \multirow{4}{*}{\centering 1} & \textbf{15} & 0 & None & \$ 0 &  \multirow{4}{*}{\centering \$ 63,811,000} \\ \cdashline{2-5}
+                                      & \textbf{31} & 0 & None & \$ 0  &     \\ \cdashline{2-5}
+                                      & \textbf{35} & 0 & None &   \$ 0 &     \\ \cdashline{2-5}
+                                      & \textbf{43} & 3 & First & \$ 63,811,000 &        \\ \hline
+        \multirow{4}{*}{\centering 2} & \textbf{15} & 1 & Second  & \$ 6,010,900 &  \multirow{4}{*}{\centering \$ 101,931,600} \\ \cdashline{2-5}
+                                      & \textbf{31} & 0 & None & \$ 0 &     \\ \cdashline{2-5}
+                                      & \textbf{35} & 2 & Second & \$ 32,109,700 &   \\ \cdashline{2-5}
+                                      & \textbf{43} & 3 & First & \$ 63,811,000 &      \\ \hline
+        \multirow{4}{*}{\centering 3} & \textbf{15} & 3 & Second  & \$ 29,637,300 & \multirow{4}{*}{\centering \$ 155,506,800} \\ \cdashline{2-5}
+                                      & \textbf{31} & 0 & None & \$ 0 &           \\ \cdashline{2-5}
+                                      & \textbf{35} & 3 & Second & \$ 62,058,500 &     \\ \cdashline{2-5}
+                                      & \textbf{43} & 3 & First & \$ 63,811,000 &    \\ \hline
+    \end{tabular}
+    \caption{Supplier Upgrades in each scenario for Communication 10}
+    \label{tab:upgradesupoptscomm10}
+\end{table}
+\begin{table}[htb]
+    \centering
+    \color{black}
+    \begin{tabular}{|c|c:c:c|c|}
+        \hline
+        \textbf{Scenario} & \textbf{Upgraded Pipelines} & \textbf{Period} & \textbf{Cost} & \textbf{Scenario Cost}\\ \hline
+        \multirow{3}{*}{\centering 1} & \text{(43, 32)} & First  & \$ 2,200,000 & \multirow{3}{*}{\centering \$ 7,426,029.99} \\ \cdashline{2-4}
+                                      & \text{(43, 4)} & First & \$ 1,897,366 &                                   \\ \cdashline{2-4}
+                                      & \text{(4, 32)} & First & \$ 3,328,663 &                                   \\ \hline
+        \multirow{5}{*}{\centering 2} & \text{(43, 32)} & First  & \$ 2,200,000 & \multirow{5}{*}{\centering \$ 11,931,621.60}                                                   \\\cdashline{2-4}
+                                      & \text{(43, 4)} & First & \$ 1,897,366 &                                   \\ \cdashline{2-4}
+                                      & \text{(4, 32)} & First & \$ 3,328,663 &                                   \\\cdashline{2-4}
+                                      & \text{(35, 38)} & Second & \$ 1,691,626 &                                   \\ \cdashline{2-4}
+                                      & \text{(32, 12)} & Second & \$ 2,813,965 & \\ \hline
+        \multirow{7}{*}{\centering 3} & \text{(43, 32)} & First & \$ 2,200,000 & \multirow{7}{*}{\centering \$ 15,272,961.09}                                                   \\\cdashline{2-4}
+                                      & \text{(43, 4)} & First & \$ 1,897,366 &                                   \\ \cdashline{2-4}
+                                      & \text{(4, 32)} & First & \$ 3,328,663 &                                   \\\cdashline{2-4}
+                                      & \text{(35, 38)} & Second & \$ 1,691,626 &                                   \\ \cdashline{2-4}
+                                      & \text{(35, 10)} & Second & \$ 2,186,869 &                                   \\\cdashline{2-4}
+                                      & \text{(15, 25)} & Second & \$ 1,154,469 &                                   \\ \cdashline{2-4}
+                                      & \text{(32, 12)} & Second & \$ 2,813,965 & \\ \hline
+    \end{tabular}
+    \caption{Pipeline Upgrades in each scenario for Communication 10}
+    \label{tab:upgradepipeoptscomm10}
+\end{table}
+\renewcommand\baselinestretch{1}
+\bigskip
+\noindent
+From here, we can add the costing for supplier upgrades and pipeline upgrades for each scenario before taking the expectation (with equal probabilities) to find the total expected upgrade cost as \(\boldsymbol{\$118,626,670.89}\). The increase of \(\$25,241,600\) is justified here because we have added a constraint to the problem. Observe how in communication 9, many of the upgrades occurred in the second time period - meaning that most of the cost was attaining the \(30\%\) discount. By constraining the second time period to have at most double the (undiscounted) cost of the first year period, it forces the model to upgrade more of the grid in the beginning. Given the lack of the 30\% discount in this first year period, the overall expected cost increases substantially.
+
+\newpage
+\subsection{Insights Into The Solution}
+\bigskip
+One of the key constraints which limited the outcome of the model was the maximum pipeline capacity value of 281 MJ. If this value were to increase it would further reduce the optimal total upgrade cost, as there would be less demand for the pipelines to be upgraded. Since the current network would have a greater capacity to distribute gas from the supplier nodes to all of the other nodes in order to meet the demand. Likewise, if the initial capacities of each of the supplier nodes were increased, it would also reduce the total optimal cost, since there would be less of a demand for supplier nodes to undergo upgrades. 
+\bigskip
+\\
+Furthermore, if the costs associated with upgrading the pipelines or upgrade costs for the supplier nodes were to be reduced, this would intuitively reduce the total optimal cost to meet forecasted demands. Similarly, if the discount factor for the second year was increased higher than 30\% the corresponding optimal cost would also be reduced.
+\bigskip
+\\
+Another key constraint is the forecasted demand of each node for both time periods. If in the real world situation, the demand was higher or lower than the forecasted value this would have an impact on which upgrades need to be conducted and in what time period. For example, if the forecasted demand was greater than the realised demand, then Pacific Paradise Gas may have unnecessarily upgraded the supplier nodes and pipelines. Vice versa that if the forecasted demand was lower than the realised demand, they may not have upgraded the pipelines and supplier nodes when it was necessary, and hence may not be able to meet their demand. 
+\bigskip
+\\
+If the likelihoods for each of the three scenarios in the second 5-year period were to change, this would subsequently change the optimal expected upgrade cost determined by the model. For example, if it was more likely for Scenario 3 (the upturn, in which the realised demand is 20\% higher) to occur, then it would mean that the overall expected cost would increase as there would be a higher likelihood of more upgrades needing to be undergone in order to meet the demands of the upturn scenario.
+\bigskip
+\\
+The optimal cost has been constrained by the ability for each supplier node to only be upgraded once. Although this is feasible for the two time periods for this assignment, it may be necessary for Pacific Paradise Gas to allow the Supplier Nodes to be upgraded multiple times if the demand continues to increase at such a large rate. 
+\bigskip
+\\
+Finally, Pacific Paradise Gas has not indicated the time duration that it would take for the supplier node upgrades to be completed. It is also unknown if there would be an impact on producing gas from the supplier nodes for the duration of their upgrade. This would have a major impact on the supply of the gas, and the upgrades may need to occur at varying times over the 10 years. 
+
+\bigskip
+\color{black}
+\end{document}
