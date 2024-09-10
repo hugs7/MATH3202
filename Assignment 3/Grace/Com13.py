@@ -3,7 +3,6 @@
 """
 Created on Wed May 17 16:07:57 2023
 
-@author: graceburtenshaw
 """
 Demand = {1: 15,
           2: 10,
